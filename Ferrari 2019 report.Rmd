@@ -1,0 +1,325 @@
+---
+title: "ferrari 2019"
+author: "Moises Carrillo"
+date: "2024-08-17"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(RColorBrewer)
+library(readr)
+```
+
+## Introduction
+
+This report analyzes the performance of the ferrari team in the 2019 Formula 1 season. We examine aspects such as final positions, points earned, poles, victories, tracks and fastest laps, as well as the pole-to-victory conversion rate.
+
+# Data loading and preparation
+
+In this part we load the data and we do some cleaning of the database
+
+```{r}
+f1_2019_results <- read.csv('C:/Users/moise/Analysis_project/formula1_2019season_raceResults.csv')
+
+ferrari_2019 <- f1_2019_results %>%
+  filter(Team == "Ferrari", ignore.case = TRUE) %>% 
+  select(Driver, Position, Points, Track, Starting.Grid, Fastest.Lap)
+
+str(ferrari_2019$Position)
+ferrari_2019$Position <- as.numeric(ferrari_2019$Position)
+ferrari_2019$Track <- factor(ferrari_2019$Track, levels = unique(f1_2019_results$Track))
+ferrari_2019$Position[12] <- 20
+ferrari_2019$Position[22] <- 17
+ferrari_2019$Position[33] <- 18
+ferrari_2019$Position[39] <- 20
+ferrari_2019 <- ferrari_2019[-29,]
+ferrari_2019 <- ferrari_2019
+row.names(ferrari_2019) <- NULL
+ferrari_2019
+
+```
+
+### Individual driver performance
+
+We analyzed the individual performance of each driver trough the entire season by visualize their finish position in each race of the 2019 season.
+
+```{r}
+ggplot(ferrari_2019, aes(x = Track, y = Position, group = Driver)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 1) +
+  scale_y_reverse() +
+  labs(title = "Individual Performance of ferrari Drivers in the 2019 Season",
+       x = "Grand Prix",
+       y = "Final Position") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 70, hjust = 1)) +
+  facet_wrap(~ Driver)
+
+```
+
+We see that bout ferrari drivers were quite inconsistent trough the season.
+
+### Points contribution
+
+We analyzed the contribution in points of each driver
+
+```{r}
+ggplot(ferrari_2019, aes(x = Track, y = Points, fill = Driver)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Points Contribution by ferrari Drivers in the 2019 Season",
+       x = "Grand Prix",
+       y = "Points") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~ Driver, ncol = 1)
+
+```
+
+Even the inconsisten, bout ferrari drivers were able to get victories.
+
+## Total points analysis
+
+### Total points by driver
+
+We analyzed the total points that each driver did in the 2019 season
+
+```{r}
+total_points <- ferrari_2019 %>% 
+  group_by(Driver) %>% 
+  summarise(Totalpoints = sum(Points, na.rm = TRUE)) 
+
+total_points
+
+ggplot(total_points, aes(x = Driver, y = Totalpoints, fill = Driver)) +
+  geom_bar(stat = 'identity') +
+  labs(title = "Total Points per Driver", 
+       x = "Driver",
+       y = "Points") +
+  theme_minimal()
+
+```
+
+In his first season with Ferrari Charles Leclerc beats Sebastian Vettel who was a 4 world championship.
+
+### Team points
+
+```{r}
+ferrari_points <- ferrari_2019 %>%
+  group_by(Track) %>%
+  summarise(TotalPoints = sum(Points, na.rm = TRUE)) %>%
+  ungroup()
+
+ferrari_points
+```
+
+### Track points
+
+We analyzed which was the circuits were the team score more points
+
+```{r}
+top_circuits <- ferrari_points %>%
+  top_n(3, wt = TotalPoints) %>%
+  arrange(desc(TotalPoints))
+
+top_circuits
+
+ggplot(top_circuits, aes(x = Track, y = TotalPoints, fill = Track))+
+  geom_bar(stat = "identity")+
+  labs(title = "Points of ferrari in the 2019 season")+
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 70, hjust = 1))
+```
+
+We see that there were 3 best circuits where the team score the same amount of points.
+
+### Total pints per track
+
+We analyzed how many points scored Ferrari per each circuit
+
+```{r}
+ggplot(ferrari_points, aes(x = Track, y = TotalPoints, fill = Track))+
+  geom_bar(stat = "identity")+
+  labs(title = "Points of ferrari in the 2019 season")+
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 70, hjust = 1))+
+  scale_fill_manual(values = colorRampPalette(brewer.pal(12, "Set3"))(21))
+```
+
+### Total points of the season for the team
+
+```{r}
+total_points_season <- ferrari_2019 %>% 
+  summarise(TotalPoints = sum(Points, na.rm = TRUE))
+
+total_points_season
+
+```
+
+At the end of the season, Ferrari scored 504 points and that give them the second place in the Constructors championship of the 2019 season of Formula 1
+
+## Analysis of poles and victories
+
+### Number of poles per driver
+
+We analyzed the number of poles that each driver did.
+
+```{r}
+n_poles <- ferrari_2019 %>% 
+  filter(Starting.Grid == 1) %>%
+  count(Driver, name = "NumPoles")
+
+n_poles
+
+ggplot(n_poles, aes(x = Driver, y = NumPoles, fill = Driver)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Number of Poles by ferrari Drivers in 2019",
+       x = "Driver",
+       y = "Number of Poles") +
+  theme_minimal()
+
+```
+
+We see that Charles Leclerc get more poles than Sebastian Vettel.
+
+### Track poles
+
+We analyzed in which circuits the drivers made pole position
+
+```{r}
+ferrari_2019$Track <- as.character(ferrari_2019$Track)#Convert track into a vector
+
+track_poles <- ferrari_2019 %>% 
+  filter(Starting.Grid == 1) %>% 
+  select(Driver, Track)
+
+track_poles
+```
+
+### Number of victories per driver
+
+We analyzed the number of victories that each driver did, and we compared.
+
+```{r}
+n_victories <- ferrari_2019 %>% 
+  filter(Position == 1) %>%
+  count(Driver, name = "NumVictories")
+
+n_victories
+
+ggplot(n_victories, aes(x = Driver, y=NumVictories, fill = Driver))+
+  geom_bar(stat="identity")+
+  labs(title = "Number of Victories by ferrari Drivers in 2019",
+       x = "Driver",
+       y = "Number of Victories")+
+  theme_minimal()
+
+```
+
+Leclerc score 1 more victory than Sebastian Vettel
+
+### Track victories
+
+We analyzed in which circuits the drivers got a victories
+
+```{r}
+n_victories <- ferrari_2019 %>% 
+  filter(Position == 1)%>%
+  count(Driver, name = "NumVictories")
+
+n_victories
+```
+
+### Pole to victory conversion rate
+
+As each driver made pole and victory, we analyzed what was the conversion rate that each driver made to convert a pole to victory
+
+```{r}
+poles_victories <- ferrari_2019 %>%
+  group_by(Driver) %>% 
+  filter(Starting.Grid == 1) %>%
+  summarise(TotalPoles = n(),
+            PolesConvertedToWins = sum(Position == 1)) %>%
+  mutate(ConversionRate = (PolesConvertedToWins / TotalPoles) * 100)
+
+poles_victories
+
+ggplot(poles_victories, aes(x = Driver, y = ConversionRate, fill = Driver)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Pole-to-Victory Conversion Rate in 2019",
+       x = "Driver",
+       y = "Conversion Rate (%)") +
+  theme_minimal()
+
+```
+
+Even score more poles, Leclerc was only able to transform 7 Poles position to 2 victories trough the season.
+
+### Poles and victory
+
+This is for in which circuit the driver made pole and get the victory of the same race
+
+```{r}
+poles_and_victorie <- ferrari_2019 %>% 
+  filter(Starting.Grid == 1, Position == 1) %>% 
+  select(Driver, Track)
+
+poles_and_victorie
+```
+
+## Analyze podiums and fastest laps
+
+#Podiums
+
+We analyzed how many podiums got each driver
+
+```{r}
+podiums_per_driver <- ferrari_2019 %>%
+  group_by(Driver) %>% 
+  filter(Position %in% 1:3) %>%
+  count(Driver, name = "NumPodiums")
+
+podiums_per_driver
+
+#Graphs of podiums
+ggplot(podiums_per_driver, aes(x = Driver, y = NumPodiums, fill = Driver)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Número de Podios por Piloto de ferrari en 2019",
+       x = "Piloto",
+       y = "Número de Podios") +
+  theme_minimal()
+facet_wrap(~Driver)
+```
+
+We see that for the minimum Leclerc beats Vettel in the podiums.
+
+### Fastests laps
+
+We analyzed how many fastests laps got each driver.
+
+```{r}
+fastest_laps_per_driver <- ferrari_2019 %>%
+  group_by(Driver) %>% 
+  filter(Fastest.Lap == "Yes") %>%
+  count(Driver, name = "NumFastestLaps")
+
+fastest_laps_per_driver
+
+#graphs of fastest laps
+ggplot(fastest_laps_per_driver, aes(x = Driver, y = NumFastestLaps, fill = Driver)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Número de Vueltas Rápidas por Piloto de ferrari en 2019",
+       x = "Piloto",
+       y = "Número de Vueltas Rápidas") +
+  theme_minimal()
+facet_wrap(~Driver)
+```
+
+We see that Charles Leclerc made more fastests laps than Sebastian Vettel
+
+# Conclusion
+
+This analysis showcases that bout drivers had quite the same consistent,Leclerc beats Vettel by quite few points to different others teams.
